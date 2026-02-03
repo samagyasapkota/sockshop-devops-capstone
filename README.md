@@ -9,7 +9,7 @@
 
 A complete end-to-end DevOps implementation for the Sock Shop microservices application, demonstrating enterprise-grade infrastructure automation, container orchestration, CI/CD pipeline, and observability on AWS.
 
-**Live Application**: http://a5b587c8371274e0bb55bb60cf41ee38-1798083232.eu-north-1.elb.amazonaws.com
+**Live Application**: http://acf3086d2d7cf4d0e8249dab68e69955-1234670187.eu-north-1.elb.amazonaws.com/index.html
 
 ## 🏗️ Architecture
 ```
