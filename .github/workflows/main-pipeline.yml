@@ -1,0 +1,102 @@
+name: Sock Shop CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: eu-north-1
+  EKS_CLUSTER: sockshop-eks
+  ECR_REGISTRY: 396341923464.dkr.ecr.eu-north-1.amazonaws.com
+
+jobs:
+  validate:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Validate Kubernetes manifests
+        run: |
+          kubectl apply --dry-run=client -f deploy/kubernetes/complete-demo.yaml
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/development'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f deploy/kubernetes/complete-demo.yaml
+          
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment -n sock-shop --timeout=10m || true
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n sock-shop
+          kubectl get svc -n sock-shop
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f deploy/kubernetes/complete-demo.yaml
+          
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment -n sock-shop --timeout=10m
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n sock-shop
+          kubectl get svc -n sock-shop
+
+      - name: Get Application URL
+        run: |
+          echo "Application URL:"
+          kubectl get svc front-end -n sock-shop -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
