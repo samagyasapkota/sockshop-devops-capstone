@@ -1,0 +1,30 @@
+name: Sock Shop Deployment Pipeline
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-north-1
+  EKS_CLUSTER: sockshop-eks
+
+jobs:
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy Application
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+          kubectl create namespace sock-shop --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f deploy/kubernetes/complete-demo.yaml -n sock-shop
